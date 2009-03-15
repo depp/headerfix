@@ -72,6 +72,8 @@ class GenHandler(Handler):
                     if line.startswith(self.slcomment):
                         header.append(line[len(self.slcomment):].strip())
                         htext.append(line)
+                    else:
+                        break
             elif self.mlcomment:
                 mlbegin, mlend = self.mlcomment
                 if body[0].startswith(mlbegin):
