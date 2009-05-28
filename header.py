@@ -10,7 +10,13 @@ LICENSE = [
     'Version 3. See gpl-3.0.txt for details.'
 ]
 
+EXCLUDE = set(['build', 'setup.py'])
+
 class MyHeaderFixer(fixheader.HeaderFixer):
+    def filter_path(self, path, isdir):
+        if path in EXCLUDE:
+            return False
+        return super(MyHeaderFixer, self).filter_path(path, isdir)
     def project_name(self, path):
         return "Header Fixer"
     def project_author(self, path):

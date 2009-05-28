@@ -1,5 +1,5 @@
 # Header Fixer - fixheader.py
-# Copyright 2007 - 2008 Dietrich Epp <depp@zdome.net>
+# Copyright 2007 - 2009 Dietrich Epp <depp@zdome.net>
 # This source code is licensed under the GNU General Public License,
 # Version 3. See gpl-3.0.txt for details.
 import re
@@ -9,6 +9,8 @@ import sys
 import readline
 
 this_year = datetime.date.today().year
+
+exclude_re = re.compile(r'(?:.*/)?(?:[.#][^/]*|[^/]*~)$')
 
 def ask(question):
     question = '%s (y/n)? ' % question
@@ -212,7 +214,7 @@ class HeaderFixer(object):
         root, filename = os.path.split(path)
         if filename.startswith('.'):
             return self.handler_dotfile(path)
-        if not self.filter_path(path):
+        if not self.filter_path(path, False):
             return None
         base, ext = os.path.splitext(filename)
         if ext.startswith('.'):
@@ -300,18 +302,12 @@ class HeaderFixer(object):
         dates = self.format_years(dates)
         return self.gen_header(path, dates)
     
-    def filter_ext(self, path, ext):
-        return ext in self.exts
-    
-    def filter_dir(self, path):
-        root, dirname = os.path.split(path)
-        return not dirname.startswith('.')
-    
     def process_dir(self, top):
         for root, dirnames, filenames in os.walk(top):
             root = os.path.normpath(root)
             dirnames[:] = [dirname for dirname in dirnames
-                if self.filter_dir(os.path.join(root, dirname))]
+                if self.filter_path(
+                    os.path.normpath(os.path.join(root, dirname)), True)]
             for filename in filenames:
                 path = os.path.normpath(os.path.join(root, filename))
                 self.handler(path).handle(self, path)
@@ -342,7 +338,9 @@ class HeaderFixer(object):
             print()
             sys.exit(1)
 
-    def filter_path(self, path):
+    def filter_path(self, path, isdir):
+        if exclude_re.match(path):
+            return False
         return True
     def project_name(self, path):
         print("Error: Please override the project_name method.")
