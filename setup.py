@@ -1,7 +1,7 @@
 #! /usr/bin/env python3.0
 import platform
 import sys
-if platform.python_version_tuple()[0] != '3':
+if int(platform.python_version_tuple()[0]) != 3:
     sys.stderr.write("Needs version 3 of Python.\n")
     sys.exit(1)
 from distutils.core import setup
