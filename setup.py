@@ -1,5 +1,9 @@
 #! /usr/bin/env python3.0
-bytes # There is a better way to do this, but this breaks pre-3.0 Python
+import platform
+import sys
+if platform.python_version_tuple()[0] != '3':
+    sys.stderr.write("Needs version 3 of Python.\n")
+    sys.exit(1)
 from distutils.core import setup
 setup(name='Fixheader',
       version='1.0',
