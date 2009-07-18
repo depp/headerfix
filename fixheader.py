@@ -6,7 +6,32 @@ import re
 import os
 import datetime
 import sys
-import readline
+import subprocess
+# Simply loading the readline module gives us editing capabilities
+# when calling raw_input().  It's not necessary, so we ignore
+# exceptions when importing it.
+try:
+    import readline
+except ImportError:
+    pass
+
+def eval_cmd(cmd):
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    out = proc.communicate()[0]
+    if proc.returncode == 0:
+        return out
+    return None
+
+def get_author_name():
+    name = eval_cmd(['git', 'config', '--get', 'user.name'])
+    email = eval_cmd(['git', 'config', '--get', 'user.email'])
+    if name and email:
+        return '%s <%s>' % (name, email)
+    elif name:
+        return name
+    elif email:
+        return '<%s>' % email
+    return None
 
 this_year = datetime.date.today().year
 
@@ -15,7 +40,7 @@ exclude_re = re.compile(r'(?:.*/)?(?:[.#][^/]*|[^/]*~)$')
 def ask(question):
     question = '%s (y/n)? ' % question
     while 1:
-        answer = input(question)
+        answer = raw_input(question)
         if answer.lower().startswith('y'):
             return True
         elif answer.lower().startswith('n'):
@@ -38,11 +63,11 @@ class Handler(object):
             print('%s: current header' % path)
             for line in htext:
                 line = line.rstrip('\n')
-                print('  >', line)
+                print('  > ' + line)
             print('%s: new header' % path)
             for line in new_htext:
                 line = line.rstrip('\n')
-                print('  >', line)
+                print('  > ' + line)
             if ask('apply header'):
                 do_header = True
             else:
