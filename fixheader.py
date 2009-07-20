@@ -360,7 +360,7 @@ class HeaderFixer(object):
                 else:
                     raise Exception("Can't process %r" % path)
         except KeyboardInterrupt:
-            print()
+            print
             sys.exit(1)
 
     def filter_path(self, path, isdir):
