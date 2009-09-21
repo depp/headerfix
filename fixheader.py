@@ -366,11 +366,13 @@ class HeaderFixer(object):
     def filter_path(self, path, isdir):
         if exclude_re.match(path):
             return False
+        if path in getattr(self, "EXCLUDE", ()):
+            return False
         return True
     def project_name(self, path):
-        print("Error: Please override the project_name method.")
-        sys.exit(1)
+        return self.PROJECT_NAME
     def header_suffix(self, path):
-        return []
+        return self.HEADER_SUFFIX
+    HEADER_SUFFIX = []
     def project_author(self, path):
-        print("Error: Please override the project_author method.")
+        return self.AUTHOR
