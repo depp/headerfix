@@ -220,6 +220,7 @@ class HeaderFixer(object):
         'm': 'c', # Objective-C
         'mm': 'c', # Objective-C++
         'h': 'h', # C Header
+        'hpp': 'h', # C++ Header
         'py': 'py', # Python
         'rl': 'c', # Ragel
     }
