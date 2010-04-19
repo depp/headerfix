@@ -7,6 +7,7 @@ import stat
 import re
 import optparse
 import fnmatch
+import subprocess
 try:
     import readline
 except ImportError:
@@ -129,8 +130,7 @@ def fread(path):
 def fwrite(path, text):
     f = open(path, 'w')
     try:
-        for line in text:
-            f.write(line)
+        f.write(text);
     finally:
         f.close()
 
@@ -155,7 +155,7 @@ def scan_file(fabs, frel, options):
     if ext not in EXTS:
         return
     gn = None
-    if (ext == '.h' and
+    if (ext in ('.h', '.hpp') and
         not os.path.isfile(base + '.m') and
         not os.path.isfile(base + '.mm')):
         if frel.startswith('include/'):
@@ -164,15 +164,29 @@ def scan_file(fabs, frel, options):
             gn = frel
         gn = nontok.subn('_', gn)[0].upper()
     text = fread(fabs)
-    ohead = []
-    otail = []
-    if options.strip:
-        if '/*' in text[0] >= 0:
-            while True:
-                l = text.pop(0)
-                ohead.append(l)
-                if '*/' in l:
-                    break
+    otext = text[:]
+
+    # Remove header comment
+    if options.strip and '/*' in text[0] >= 0:
+        comment = []
+        while text:
+            l = text.pop(0)
+            comment.append(l)
+            if '*/' in l:
+                break
+        if comment:
+            print frel
+            if not options.no_diff:
+                print 'Header comment'
+                for line in comment:
+                    print '    ' + line,
+            if not options.no_action:
+                if options.yes or prompt('delete comment?'):
+                    pass
+                else:
+                    text = comment + text
+
+    # Add guard, removing old one
     if gn:
         nhead = ['#ifndef ' + gn + '\n', '#define ' + gn + '\n']
         ntail = ['#endif\n']
@@ -183,26 +197,43 @@ def scan_file(fabs, frel, options):
         if text[0].startswith('#ifndef') and \
                 text[1].startswith('#define') and \
                 text[-1].startswith('#endif'):
-            if text[:2] == nhead and text[-1:] == ntail:
-                nhead = []
-                ntail = []
+            text = nhead + text[2:-1] + ntail
+
+    # Detabify, remove trailing space, remove double blank lines,
+    # remove trailing blank lines, ensure trailing newline
+    if options.whitespace:
+        blank = False
+        ntext = []
+        for line in text:
+            line = line.expandtabs(options.tabsize).rstrip()
+            if line:
+                if blank:
+                    ntext.append('\n')
+                ntext.append(line + '\n')
+                blank = False
             else:
-                ohead.extend(text[:2])
-                otail = [text[-1]]
-                text = text[2:-1]
-    if not nhead and not ntail and not ohead and not otail:
+                blank = True
+        text = ntext
+    if options.width:
+        width = options.width
+        for n, line in enumerate(text):
+            if len(line) > width + 1: # for line feed
+                print '===== Line %s:%i too wide (%i columns) =====' % \
+                    (frel, n + 1, len(line))
+                print line,
+
+    # Ask user if changes are acceptable
+    if otext == text:
         return
+    text = ''.join(text)
     print frel
     if not options.no_diff:
-        print 'Old version:'
-        for line in ohead + ['<<body>>\n'] + otail:
-            print '    ' + line,
-        print 'New version:'
-        for line in nhead + ['<<body>>\n'] + ntail:
-            print '    ' + line,
+        proc = subprocess.Popen(['diff', '-u', '--', fabs, '-'],
+                                stdin=subprocess.PIPE)
+        proc.communicate(text)
     if not options.no_action:
         if options.yes or prompt('apply changes?'):
-            fwrite(fabs, nhead + text + ntail)
+            fwrite(fabs, text)
 
 def scan_dir(rootabs, rootrel, options, filter):
     fnames = list(os.listdir(rootabs))
@@ -252,6 +283,15 @@ def run():
     parser.add_option('--no-diff', dest='no_diff',
                       help='suppress diff',
                       action='store_true', default=False)
+    parser.add_option('-t', '--tabsize', dest='tabsize',
+                      help='set tabsize, default 8',
+                      action='store', type='int', default=8)
+    parser.add_option('-w', '--whitespace', dest='whitespace',
+                      help='fix whitespace issues',
+                      action='store_true', default=False)
+    parser.add_option('--width', dest='width',
+                      help='check width',
+                      action='store', default=0, type='int')
     (options, args) = parser.parse_args()
     ignore = []
     for opt in options.ignore:
