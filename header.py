@@ -187,17 +187,14 @@ def scan_file(fabs, frel, options):
                     text = comment + text
 
     # Add guard, removing old one
-    if gn:
-        nhead = ['#ifndef ' + gn + '\n', '#define ' + gn + '\n']
-        ntail = ['#endif\n']
-    else:
-        nhead = []
-        ntail = []
     if len(text) >= 3:
         if text[0].startswith('#ifndef') and \
                 text[1].startswith('#define') and \
                 text[-1].startswith('#endif'):
-            text = nhead + text[2:-1] + ntail
+            text = text[2:-1]
+    if gn:
+        text = ['#ifndef ' + gn + '\n', '#define ' + gn + '\n'] + \
+            text + ['#endif\n']
 
     # Detabify, remove trailing space, remove double blank lines,
     # remove trailing blank lines, ensure trailing newline
