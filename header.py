@@ -8,10 +8,19 @@ import re
 import optparse
 import fnmatch
 import subprocess
+import json
 try:
     import readline
 except ImportError:
     pass
+
+ISTTY = sys.stdout.isatty()
+
+def hilite(string):
+    if not ISTTY:
+        return string
+    attr = ['31', '1']
+    return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
 
 class AbsPattern(object):
     def __init__(self, parts):
@@ -150,24 +159,51 @@ def prompt(p):
             return False
         print "Can't understand answer %r" % answer
 
-def scan_file(fabs, frel, options):
-    base, ext = os.path.splitext(fabs)
+class Proxy(object):
+    def __init__(self, name):
+        self.name = name
+    def __repr__(self):
+        return '<Proxy %r>' % self.name
+
+class ChainDict(object):
+    """Dictionary type which can 'inherit' from parent dictionaries."""
+    _unset = Proxy("unset")
+    def __init__(self, parent=None):
+        self._parent = parent
+    def __getattribute__(self, key):
+        if key.startswith('_'):
+            return object.__getattribute__(self, key)
+        try:
+            val = object.__getattribute__(self, key)
+        except AttributeError:
+            pass
+        else:
+            if val is ChainDict._unset:
+                raise AttributeError(key)
+            return val
+        return getattr(object.__getattribute__(self, '_parent'), key)
+    def __delattr__(self, key):
+        object.__setattr__(self, ChainDict._unset)
+
+def scan_file(opts, relpath):
+    base, ext = os.path.splitext(relpath)
+    abspath = os.path.join(opts.root, relpath)
     if ext not in EXTS:
         return
     gn = None
-    if (ext in ('.h', '.hpp') and
-        not os.path.isfile(base + '.m') and
-        not os.path.isfile(base + '.mm')):
-        if frel.startswith('include/'):
-            gn = frel[len('include/'):]
+    if ext in ('.h', '.hpp') and opts.guards:
+        guard_root = opts.guard_root
+        assert relpath.startswith(guard_root)
+        if guard_root:
+            gn = relpath[len(guard_root) + 1:]
         else:
-            gn = frel
-        gn = nontok.subn('_', gn)[0].upper()
-    text = fread(fabs)
+            gn = relpath
+        gn = nontok.subn('_', opts.guard_prefix + gn)[0].upper()
+    text = fread(abspath)
     otext = text[:]
 
     # Remove header comment
-    if options.strip and '/*' in text[0] >= 0:
+    if opts.strip and '/*' in text[0] >= 0:
         comment = []
         while text:
             l = text.pop(0)
@@ -175,13 +211,13 @@ def scan_file(fabs, frel, options):
             if '*/' in l:
                 break
         if comment:
-            print frel
-            if not options.no_diff:
+            print relpath
+            if not opts.no_diff:
                 print 'Header comment'
                 for line in comment:
                     print '    ' + line,
-            if not options.no_action:
-                if options.yes or prompt('delete comment?'):
+            if not opts.no_action:
+                if opts.yes or prompt('delete comment?'):
                     pass
                 else:
                     text = comment + text
@@ -198,11 +234,12 @@ def scan_file(fabs, frel, options):
 
     # Detabify, remove trailing space, remove double blank lines,
     # remove trailing blank lines, ensure trailing newline
-    if options.whitespace:
+    if opts.whitespace:
+        tabsize = opts.tabsize
         blank = False
         ntext = []
         for line in text:
-            line = line.expandtabs(options.tabsize).rstrip()
+            line = line.expandtabs(tabsize).rstrip()
             if line:
                 if blank:
                     ntext.append('\n')
@@ -211,54 +248,130 @@ def scan_file(fabs, frel, options):
             else:
                 blank = True
         text = ntext
-    if options.width:
-        width = options.width
+    width = opts.width
+    if width > 0:
+        toolong = False
         for n, line in enumerate(text):
-            if len(line) > width + 1: # for line feed
-                print '===== Line %s:%i too wide (%i columns) =====' % \
-                    (frel, n + 1, len(line))
-                print line,
+            columns = len(line.rstrip())
+            if columns > width:
+                if not toolong:
+                    print hilite('===== %s: Lines too long =====' %
+                                 relpath)
+                    toolong = True
+                print '%s:%i: line too long (%d columns wide)' % (
+                    relpath, n + 1, columns);
 
     # Ask user if changes are acceptable
     if otext == text:
         return
     text = ''.join(text)
-    print frel
-    if not options.no_diff:
-        proc = subprocess.Popen(['diff', '-u', '--', fabs, '-'],
+    print relpath
+    if not opts.no_diff:
+        proc = subprocess.Popen(['diff', '-u', '--', abspath, '-'],
                                 stdin=subprocess.PIPE)
         proc.communicate(text)
-    if not options.no_action:
-        if options.yes or prompt('apply changes?'):
-            fwrite(fabs, text)
+    if not opts.no_action:
+        if opts.yes or prompt('apply changes?'):
+            fwrite(abspath, text)
 
-def scan_dir(rootabs, rootrel, options, filter):
-    fnames = list(os.listdir(rootabs))
-    if '.git' in fnames and rootrel:
-        print 'Skipping separate repository %r' % rootrel
+class SettingError(Exception):
+    pass
+
+def set_guard_prefix(opts, value, dirpath):
+    if not isinstance(value, basestring):
+        raise SettingError("guard_prefix must be a string")
+    opts.guard_prefix = value
+    opts.guard_root = dirpath
+
+def set_ignore(opts, value, dirpath):
+    if not isinstance(value, list):
+        if isinstance(value, basestring):
+            value = [value]
+        else:
+            raise SettingError("ignore must be a string or list of strings")
+    else:
+        for v in value:
+            if not isinstance(v, basestring):
+                raise SettingError(
+                    "ignore must be a string or list of strings")
+    opts.filter = opts.filter.add_pats(value)
+
+def set_guards(opts, value, dirpath):
+    if not isinstance(value, bool):
+        raise SettingError("guards must be a boolean")
+    opts.guards = value
+
+def set_width(opts, value, dirpath):
+    if not isinstance(value, int):
+        raise SettingError("width must be integer")
+    opts.width = value
+
+def set_tabsize(opts, value, dirpath):
+    if not (isinstance(value, int) and 1 < value < 8):
+        raise SettingError("tabsize must be integer between 1 and 8")
+    opts.tabsize = value
+
+SETKEYS = {
+    'guard_prefix': set_guard_prefix,
+    'ignore': set_ignore,
+    'guards': set_guards,
+    'width': set_width,
+    'tabsize': set_tabsize,
+}
+
+def read_settings(opts, abspath, dirpath):
+    try:
+        data = json.load(open(abspath, 'rb'))
+        for key, value in data.iteritems():
+            try:
+                setter = SETKEYS[key]
+            except KeyError:
+                raise SettingError("unknown setting %r" % key)
+            setter(opts, value, dirpath)
+    except (ValueError, SettingError) as ex:
+        print >> sys.stderr, "%s: %s" % (
+            os.path.join(dirpath, '.header'), ex)
+        sys.exit(1)
+
+def scan_dir(opts, relpath):
+    root = opts.root
+    abspath = os.path.join(root, relpath)
+
+    fnames = list(os.listdir(abspath))
+    fnames.sort()
+    if '.git' in fnames and relpath:
+        print 'Skipping separate repository %r' % relpath
         return
+
     if '.gitignore' in fnames:
-        filter = filter.read(rootabs + '/.gitignore')
-    for fname in os.listdir(rootabs):
-        frel = rootrel + fname
+        ignore = os.path.join(abspath, '.gitignore')
+        opts.filter = opts.filter.read(ignore)
+
+    if '.header' in fnames:
+        read_settings(opts, os.path.join(abspath, '.header'), relpath)
+
+    filter = opts.filter
+    for fname in fnames:
         if fname.startswith('.'):
             continue
-        fabs = rootabs + '/' + fname
-        s = os.stat(fabs)
+        frelpath = os.path.join(relpath, fname)
+        fabspath = os.path.join(abspath, fname)
+        s = os.stat(fabspath)
         if stat.S_ISDIR(s.st_mode):
-            filter2 = filter.matchdir(fname)
-            frel += '/'
-            if filter2:
-                scan_dir(fabs, frel, options, filter2)
+            subfilter = filter.matchdir(fname)
+            if not subfilter:
+                if opts.verbose:
+                    print 'Skipping %r' % frelpath
             else:
-                if options.verbose:
-                    print 'Skipping %r' % frel
+                subopts = ChainDict(opts)
+                subopts.filter = subfilter
+                scan_dir(subopts, frelpath)
         elif stat.S_ISREG(s.st_mode):
             if filter.matchfile(fname):
-                scan_file(fabs, frel, options)
+                scan_file(opts, frelpath)
             else:
-                if options.verbose:
-                    print 'Skipping %r' % frel
+                if opts.verbose:
+                    print 'Skipping %r' % frelpath
 
 def run():
     parser = optparse.OptionParser()
@@ -295,7 +408,13 @@ def run():
         ignore.extend(opt.split(','))
     filter = PatternSet().add_pats(ignore)
     for arg in args or ['.']:
-        scan_dir(arg, '', options, filter)
+        opts = ChainDict(options)
+        opts.root = os.path.abspath(arg)
+        opts.guard_root = ''
+        opts.guard_prefix = ''
+        opts.guards = True
+        opts.filter = filter
+        scan_dir(opts, '')
 
 try:
     run()
