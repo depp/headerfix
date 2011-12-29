@@ -14,6 +14,9 @@ try:
 except ImportError:
     pass
 
+# Tracks warnings for display at end
+toolong = []
+
 ISTTY = sys.stdout.isatty()
 
 def hilite(string):
@@ -185,13 +188,71 @@ class ChainDict(object):
     def __delattr__(self, key):
         object.__setattr__(self, ChainDict._unset)
 
+DIRECTIVE = re.compile('#\s*(\w+)')
+
+def split_directives(text, directives):
+    """Split text (list of lines) into two arrays.
+
+    The first array is the longest one containing only valid C or C++
+    style comments and directives from the given set, which can be
+    empty.
+    """
+    extent = 0
+    pos = 0
+    end = len(text)
+    while True:
+        if pos >= end:
+            break
+        l = text[pos].strip()
+        while l.startswith('/*'):
+            l = l[2:]
+            while True:
+                i = l.find('*/')
+                if i >= 0:
+                    l = l[i+2:].strip()
+                    break
+                pos += 1
+                if pos >= end:
+                    l = ''
+                    break
+                l = text[pos]
+        if l.startswith('//') or not l:
+            pos += 1
+            extent = pos
+            continue
+        if directives:
+            m = DIRECTIVE.match(l)
+            if m and m.group(1) in directives:
+                pos += 1
+                extent = pos
+                continue
+        break
+    return text[:extent], text[extent:]
+
+EXTERNC = re.compile('extern\s*"C"');
+EXTERNC_PRE = [
+    '#ifdef __cplusplus\n',
+    'extern "C" {\n',
+    '#endif\n',
+]
+EXTERNC_POST = [
+    '#ifdef __cplusplus\n',
+    '}\n',
+    '#endif\n',
+]
+
 def scan_file(opts, relpath):
     base, ext = os.path.splitext(relpath)
     abspath = os.path.join(opts.root, relpath)
     if ext not in EXTS:
         return
+
+    is_header = ext in ('.h', '.hpp')
+    is_c_header = ext == '.h'
+
+    # Calculate header guard name
     gn = None
-    if ext in ('.h', '.hpp') and opts.guards:
+    if is_header and opts.guards:
         guard_root = opts.guard_root
         assert relpath.startswith(guard_root)
         if guard_root:
@@ -201,36 +262,6 @@ def scan_file(opts, relpath):
         gn = nontok.subn('_', opts.guard_prefix + gn)[0].upper()
     text = fread(abspath)
     otext = text[:]
-
-    # Remove header comment
-    if opts.strip and '/*' in text[0] >= 0:
-        comment = []
-        while text:
-            l = text.pop(0)
-            comment.append(l)
-            if '*/' in l:
-                break
-        if comment:
-            print relpath
-            if not opts.no_diff:
-                print 'Header comment'
-                for line in comment:
-                    print '    ' + line,
-            if not opts.no_action:
-                if opts.yes or prompt('delete comment?'):
-                    pass
-                else:
-                    text = comment + text
-
-    # Add guard, removing old one
-    if len(text) >= 3:
-        if text[0].startswith('#ifndef') and \
-                text[1].startswith('#define') and \
-                text[-1].startswith('#endif'):
-            text = text[2:-1]
-    if gn:
-        text = ['#ifndef ' + gn + '\n', '#define ' + gn + '\n'] + \
-            text + ['#endif\n']
 
     # Detabify, remove trailing space, remove double blank lines,
     # remove trailing blank lines, ensure trailing newline
@@ -248,31 +279,63 @@ def scan_file(opts, relpath):
             else:
                 blank = True
         text = ntext
+
+    # Remove first comment
+    head1, text = split_directives(text, ())
+
+    # Remove old header guard
+    if len(text) >= 3:
+        if text[0].startswith('#ifndef') and \
+                text[1].startswith('#define') and \
+                text[-1].startswith('#endif'):
+            text = text[2:-1]
+
+    if is_c_header and opts.externc:
+        # Check for existence of 'extern "C"' anywhere in the file
+        # If it exists, don't mess with it
+        for line in text:
+            if EXTERNC.match(line):
+                break
+        else:
+            # Remove next comment, with '#include' / '#import'
+            head2, text = split_directives(text, ('include', 'import'))
+
+            # Add 'extern "C"'
+            text = head2 + EXTERNC_PRE + text + EXTERNC_POST
+
+    # Add new header guard
+    if gn:
+        guard_pre = [
+            '#ifndef ' + gn + '\n',
+            '#define ' + gn + '\n',
+        ]
+        guard_post = [
+            '#endif\n'
+        ]
+        text = guard_pre + text + guard_post
+
+    # Add comments back
+    text = head1 + text
+
+    # Ask user if changes are acceptable
+    if otext != text:
+        text = ''.join(text)
+        print hilite('===== %s =====' % relpath)
+        if not opts.no_diff:
+            proc = subprocess.Popen(['diff', '-u', '--', abspath, '-'],
+                                    stdin=subprocess.PIPE)
+            proc.communicate(text)
+        if not opts.no_action:
+            if opts.yes or prompt('apply changes?'):
+                fwrite(abspath, text)
+
+    # Check line width
     width = opts.width
     if width > 0:
-        toolong = False
         for n, line in enumerate(text):
             columns = len(line.rstrip())
             if columns > width:
-                if not toolong:
-                    print hilite('===== %s: Lines too long =====' %
-                                 relpath)
-                    toolong = True
-                print '%s:%i: line too long (%d columns wide)' % (
-                    relpath, n + 1, columns);
-
-    # Ask user if changes are acceptable
-    if otext == text:
-        return
-    text = ''.join(text)
-    print relpath
-    if not opts.no_diff:
-        proc = subprocess.Popen(['diff', '-u', '--', abspath, '-'],
-                                stdin=subprocess.PIPE)
-        proc.communicate(text)
-    if not opts.no_action:
-        if opts.yes or prompt('apply changes?'):
-            fwrite(abspath, text)
+                toolong.append((relpath, n + 1, columns))
 
 class SettingError(Exception):
     pass
@@ -311,12 +374,18 @@ def set_tabsize(opts, value, dirpath):
         raise SettingError("tabsize must be integer between 1 and 8")
     opts.tabsize = value
 
+def set_externc(opts, value, dirpath):
+    if not isinstance(value, bool):
+        raise SettingError("externc must be a boolean")
+    opts.externc = value
+
 SETKEYS = {
     'guard_prefix': set_guard_prefix,
     'ignore': set_ignore,
     'guards': set_guards,
     'width': set_width,
     'tabsize': set_tabsize,
+    'extern_c': set_externc,
 }
 
 def read_settings(opts, abspath, dirpath):
@@ -413,8 +482,13 @@ def run():
         opts.guard_root = ''
         opts.guard_prefix = ''
         opts.guards = True
+        opts.externc = False
         opts.filter = filter
         scan_dir(opts, '')
+    if toolong:
+        print hilite('===== Lines too long =====')
+        for path, lineno, width in toolong:
+            print '%s:%i: %d columns wide' % (path, lineno, width)
 
 try:
     run()
