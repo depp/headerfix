@@ -9,6 +9,8 @@ import optparse
 import fnmatch
 import subprocess
 import json
+import datetime
+import ConfigParser
 try:
     import readline
 except ImportError:
@@ -18,6 +20,82 @@ except ImportError:
 toolong = []
 
 ISTTY = sys.stdout.isatty()
+
+GITCONFIG = None
+def get_gitconfig():
+    global GITCONFIG
+    if GITCONFIG is None:
+        c = ConfigParser.ConfigParser()
+        c.read(os.path.join(os.getenv('HOME'), '.gitconfig'))
+        GITCONFIG = c
+    return GITCONFIG
+
+def ask(what, default):
+    if default is None:
+        prompt = '%s: ' % what
+    else:
+        prompt = '%s [%s]: ' % (what, default)
+    while True:
+        try:
+            answer = raw_input(prompt)
+        except KeyboardInterrupt:
+            print
+            raise
+        except EOFError:
+            print
+            sys.exit(1)
+        answer = answer.strip()
+        if answer:
+            return answer
+        elif default is not None:
+            return default
+
+COPYRIGHT = { }
+def get_copyright(opts):
+    c = COPYRIGHT
+    try:
+        return c['message']
+    except KeyError:
+        pass
+
+    try:
+        year = c['year']
+    except KeyError:
+        year = datetime.date.today().year
+        c['year'] = year
+
+    try:
+        author = c['author']
+    except KeyError:
+        try:
+            name = opts.name
+        except AttributeError:
+            name = None
+        if name is None:
+            try:
+                name = get_gitconfig().get('user', 'name')
+            except ConfigParser.NoOptionError:
+                name = None
+            name = ask('Author name (for copyright)', name)
+
+        try:
+            email = opts.email
+        except AttributeError:
+            email = None
+        if email is None:
+            try:
+                email = get_gitconfig().get('user', 'email')
+            except ConfigParser.NoOptionError:
+                email = None
+            email = ask('Email address (for copyright)', email)
+
+        author = '%s <%s>' % (name, email)
+
+    message = ['/* Copyright %d %s\n' % (year, author),
+               '   See LICENSE.txt for details.  */\n']
+    c['message'] = message
+
+    return message
 
 def hilite(string):
     if not ISTTY:
@@ -283,6 +361,13 @@ def scan_file(opts, relpath):
     # Remove first comment
     head1, text = split_directives(text, ())
 
+    # Check for copyright notice
+    for line in head1:
+        if 'copyright' in line.lower():
+            break
+    else:
+        head1 = get_copyright(opts) + head1
+
     # Remove old header guard
     if len(text) >= 3:
         if text[0].startswith('#ifndef') and \
@@ -444,6 +529,12 @@ def scan_dir(opts, relpath):
 
 def run():
     parser = optparse.OptionParser()
+    parser.add_option('--user', dest='user',
+                      help='user name for copyright notice',
+                      action='store', default=None)
+    parser.add_option('--email', dest='email',
+                      help='email address for copyright notice',
+                      action='store', default=None)
     parser.add_option('-s', '--strip-copyright', dest='strip',
                       help='strip copyright notices', action='store_true',
                       default=False)
