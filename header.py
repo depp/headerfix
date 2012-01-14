@@ -362,42 +362,59 @@ def scan_file(opts, relpath):
     head1, text = split_directives(text, ())
 
     # Check for copyright notice
-    for line in head1:
-        if 'copyright' in line.lower():
-            break
-    else:
-        head1 = get_copyright(opts) + head1
-
-    # Remove old header guard
-    if len(text) >= 3:
-        if text[0].startswith('#ifndef') and \
-                text[1].startswith('#define') and \
-                text[-1].startswith('#endif'):
-            text = text[2:-1]
-
-    if is_c_header and opts.externc:
-        # Check for existence of 'extern "C"' anywhere in the file
-        # If it exists, don't mess with it
-        for line in text:
-            if EXTERNC.match(line):
+    if opts.copyright:
+        for line in head1:
+            if 'copyright' in line.lower():
                 break
         else:
-            # Remove next comment, with '#include' / '#import'
-            head2, text = split_directives(text, ('include', 'import'))
+            head1 = get_copyright(opts) + head1
 
-            # Add 'extern "C"'
-            text = head2 + EXTERNC_PRE + text + EXTERNC_POST
+    if is_header:
+        # Remove old header guard
+        if len(text) >= 3:
+            if text[0].startswith('#ifndef') and \
+                    text[1].startswith('#define') and \
+                    text[-1].startswith('#endif'):
+                text = text[2:-1]
 
-    # Add new header guard
-    if gn:
-        guard_pre = [
-            '#ifndef ' + gn + '\n',
-            '#define ' + gn + '\n',
-        ]
-        guard_post = [
-            '#endif\n'
-        ]
-        text = guard_pre + text + guard_post
+        if is_c_header and opts.externc:
+            # Check for existence of 'extern "C"' anywhere in the file
+            # If it exists, don't mess with it
+            for line in text:
+                if EXTERNC.match(line):
+                    break
+            else:
+                # Remove next comment, with '#include' / '#import'
+                head2, text = split_directives(text, ('include', 'import'))
+
+                # Add 'extern "C"'
+                text = head2 + EXTERNC_PRE + text + EXTERNC_POST
+
+        # Add new header guard
+        if gn:
+            guard_pre = [
+                '#ifndef ' + gn + '\n',
+                '#define ' + gn + '\n',
+            ]
+            guard_post = [
+                '#endif\n'
+            ]
+            text = guard_pre + text + guard_post
+    else:
+        # Not a header
+        if opts.configh:
+            for line in text:
+                if (line.startswith('#') and
+                    'include' in line and
+                    'config.h' in line):
+                    break;
+            else:
+                iconfig = [
+                    '#ifdef HAVE_CONFIG_H\n',
+                    '#include "config.h"\n',
+                    '#endif\n',
+                ]
+                text = iconfig + text
 
     # Add comments back
     text = head1 + text
@@ -464,6 +481,11 @@ def set_externc(opts, value, dirpath):
         raise SettingError("externc must be a boolean")
     opts.externc = value
 
+def set_configh(opts, value, dirpath):
+    if not isinstance(value, bool):
+        raise SettingError("configh must be a boolean")
+    opts.configh = value
+
 SETKEYS = {
     'guard_prefix': set_guard_prefix,
     'ignore': set_ignore,
@@ -471,6 +493,7 @@ SETKEYS = {
     'width': set_width,
     'tabsize': set_tabsize,
     'extern_c': set_externc,
+    'configh': set_configh,
 }
 
 def read_settings(opts, abspath, dirpath):
@@ -562,6 +585,12 @@ def run():
     parser.add_option('--width', dest='width',
                       help='check width',
                       action='store', default=0, type='int')
+    parser.add_option('-c', '--configh', dest='configh',
+                      help='include "config.h" from C/C++ files',
+                      action='store_true', default=False)
+    parser.add_option('--no-copyright', dest='copyright',
+                      help="don't add copyright message",
+                      action='store_false', default=True)
     (options, args) = parser.parse_args()
     ignore = []
     for opt in options.ignore:
