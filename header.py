@@ -53,10 +53,10 @@ def ask(what, default):
 COPYRIGHT = { }
 def get_copyright(opts):
     c = COPYRIGHT
-    try:
-        return c['message']
-    except KeyError:
-        pass
+    #try:
+    #    return c['message']
+    #except KeyError:
+    #    pass
 
     try:
         year = c['year']
@@ -90,11 +90,13 @@ def get_copyright(opts):
             email = ask('Email address (for copyright)', email)
 
         author = '%s <%s>' % (name, email)
+        c['author'] = author
 
-    message = ['/* Copyright %d %s\n' % (year, author),
-               '   See LICENSE.txt for details.  */\n']
-    c['message'] = message
-
+    message = ['Copyright %d %s' % (year, author)] + opts.rights
+    message[0] = '/* ' + message[0]
+    message[1:] = ['   ' + x for x in message[1:]]
+    message[-1] = message[-1] + ' */'
+    message[:] = [x + '\n' for x in message]
     return message
 
 def hilite(string):
@@ -486,6 +488,15 @@ def set_configh(opts, value, dirpath):
         raise SettingError("configh must be a boolean")
     opts.configh = value
 
+def set_rights(opts, value, dirpath):
+    if isinstance(value, basestring):
+        opts.rights = value.splitlines()
+        return
+    if (isinstance(value, list) and
+        all([isinstance(item, basestring) for item in value])):
+        opts.rights = value
+    raise SettingError("rights must be a string or list of strings")
+
 SETKEYS = {
     'guard_prefix': set_guard_prefix,
     'ignore': set_ignore,
@@ -494,6 +505,7 @@ SETKEYS = {
     'tabsize': set_tabsize,
     'extern_c': set_externc,
     'configh': set_configh,
+    'rights': set_rights,
 }
 
 def read_settings(opts, abspath, dirpath):
@@ -591,6 +603,9 @@ def run():
     parser.add_option('--no-copyright', dest='copyright',
                       help="don't add copyright message",
                       action='store_false', default=True)
+    parser.add_option('--rights', dest='rights',
+                      help="set the body of the copyright message",
+                      action='append', default=[])
     (options, args) = parser.parse_args()
     ignore = []
     for opt in options.ignore:
