@@ -10,7 +10,6 @@ import fnmatch
 import subprocess
 import json
 import datetime
-import ConfigParser
 try:
     import readline
 except ImportError:
@@ -21,14 +20,15 @@ toolong = []
 
 ISTTY = sys.stdout.isatty()
 
-GITCONFIG = None
-def get_gitconfig():
-    global GITCONFIG
-    if GITCONFIG is None:
-        c = ConfigParser.ConfigParser()
-        c.read(os.path.join(os.getenv('HOME'), '.gitconfig'))
-        GITCONFIG = c
-    return GITCONFIG
+def get_gitconfig(key, subkey):
+    proc = subprocess.Popen(
+        ['git', 'config', '-z', '--get', '%s.%s' % (key, subkey)],
+        stdout=subprocess.PIPE)
+    out, err = proc.communicate()
+    if proc.returncode:
+        return None
+    z = out.index('\0')
+    return out[:z]
 
 def ask(what, default):
     if default is None:
@@ -72,10 +72,7 @@ def get_copyright(opts):
         except AttributeError:
             name = None
         if name is None:
-            try:
-                name = get_gitconfig().get('user', 'name')
-            except ConfigParser.NoOptionError:
-                name = None
+            name = get_gitconfig('user', 'name')
             name = ask('Author name (for copyright)', name)
 
         try:
@@ -83,10 +80,7 @@ def get_copyright(opts):
         except AttributeError:
             email = None
         if email is None:
-            try:
-                email = get_gitconfig().get('user', 'email')
-            except ConfigParser.NoOptionError:
-                email = None
+            email = get_gitconfig('user', 'email')
             email = ask('Email address (for copyright)', email)
 
         author = '%s <%s>' % (name, email)
