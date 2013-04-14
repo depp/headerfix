@@ -433,7 +433,11 @@ def scan_file(opts, relpath):
         for n, line in enumerate(text):
             columns = len(line.rstrip())
             if columns > width:
-                toolong.append((relpath, n + 1, columns))
+                # URLs can be longer than 80 characters
+                # We don't want to encourage folks to remove or
+                # shorten URLs in the comments.
+                if 'http://' not in line:
+                    toolong.append((relpath, n + 1, columns))
 
 class SettingError(Exception):
     pass
