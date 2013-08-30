@@ -1,6 +1,26 @@
 import argparse
+import os
+import subprocess
+import sys
 from . import rule
 from . import scan
+from . import pattern
+
+def error(msg):
+    print >>sys.stderr, 'error: {}'.format(msg)
+    sys.exit(1)
+
+def relpath(path, base):
+    parts = []
+    curpath = path
+    while curpath != base:
+        lastpath = curpath
+        curpath, fname = os.path.split(curpath)
+        if lastpath == curpath:
+            error('path not contained in repository: {}'.format(path))
+        parts.append(fname)
+    parts.reverse()
+    return parts
 
 def run(args):
     parser = argparse.ArgumentParser()
@@ -52,9 +72,31 @@ def run(args):
         help='scan the given paths')
     args = parser.parse_args()
 
+    paths = [os.path.abspath(path) for path in args.path]
+    root = paths[0]
+    if not os.path.isdir(root):
+        root = os.path.dirname(root)
+        if not os.path.isdir(root):
+            error('cannot find repository root: {}'.format(paths[0]))
+    root = subprocess.check_output(
+        ['git', 'rev-parse', '--show-toplevel'],
+        cwd=root)[:-1]
+    paths = [relpath(path, root) for path in paths]
+    if all(paths):
+        includes = pattern.PatternSet(
+            (True, pattern.LiteralPattern(True, path)) for path in paths)
+    else:
+        includes = None
+
+    if args.ignore:
+        excludes = pattern.PatternSet.parse(args.ignore)
+    else:
+        excludes = None
+
     rules = rule.Rules({}, [])
     rules = rules.union(rule.Rules.read_global_gitignore())
-    scan.scan_dir(rules, '.')
+    for path, env in scan.scan_dir(rules, root, includes, excludes):
+        print path
 
 if __name__ == '__main__':
     import sys

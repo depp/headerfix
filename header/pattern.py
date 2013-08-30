@@ -1,7 +1,7 @@
 """Patterns for matching file paths."""
 import fnmatch
 
-class GlobPattern(object):
+class PathPattern(object):
     """A pattern that matches paths using globbing.
 
     The pattern can be rooted or unrooted.  Rooted patterns match
@@ -28,12 +28,12 @@ class GlobPattern(object):
         """
         match = False
         patterns = []
-        if fnmatch.fnmatch(name, self.parts[0]):
+        if self.match_part(name, self.parts[0]):
             if (len(self.parts) == 1 or
                 (len(self.parts) == 2 and not self.parts[1])):
                 match = True
             else:
-                patterns.append(GlobPattern(True, self.parts[1:]))
+                patterns.append(self.__class__(True, self.parts[1:]))
         if not self.rooted:
             patterns.append(self)
         return match, patterns
@@ -55,6 +55,20 @@ class GlobPattern(object):
         if directory:
             parts.append('')
         return class_(rooted, parts)
+
+    @staticmethod
+    def match_part(fname, pattern):
+        raise NotImplementedError('PathPattern.match_part')
+
+class LiteralPattern(PathPattern):
+    @staticmethod
+    def match_part(fname, pattern):
+        return fname == pattern
+
+class GlobPattern(PathPattern):
+    @staticmethod
+    def match_part(fname, pattern):
+        return fnmatch.fnmatch(fname, pattern)
 
 class PatternSet(object):
     """A set of positive and negative patterns."""
@@ -115,7 +129,7 @@ class PatternSet(object):
                     continue
             else:
                 positive = True
-            patterns.append((pasitive, GlobPattern.parse(string)))
+            patterns.append((positive, GlobPattern.parse(string)))
         return class_(patterns)
 
     @classmethod

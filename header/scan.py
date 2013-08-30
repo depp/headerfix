@@ -2,7 +2,7 @@ import os
 import stat
 from . import rule
 
-def scan_dir(rules, path):
+def scan_dir(rules, path, includes, excludes):
     try:
         fp = open(os.path.join(path, '.gitignore'))
     except IOError:
@@ -32,15 +32,33 @@ def scan_dir(rules, path):
             dirs.append(fname)
 
     for fname in files:
+        if includes is not None and not includes.match_file(fname):
+            continue
+        if excludes is not None and excludes.match_file(fname):
+            continue
         env = rules.file_env(fname)
         if env is None:
             continue
+        yield os.path.join(path, fname), env
 
     for fname in dirs:
+        if includes is not None:
+            match, dir_includes = includes.match_dir(fname)
+            if match:
+                dir_includes = None
+        else:
+            dir_includes = None
+        if excludes is not None:
+            match, dir_excludes = excludes.match_dir(fname)
+            if match:
+                continue
+        else:
+            dir_excludes = None
         drules = rules.dir_rules(fname)
         if drules is None:
             continue
         fpath = os.path.join(path, fname)
         if os.path.exists(os.path.join(fpath, '.git')):
             continue
-        scan_dir(drules, fpath)
+        for result in scan_dir(drules, fpath, dir_includes, dir_excludes):
+            yield result
