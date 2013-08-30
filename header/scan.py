@@ -12,6 +12,10 @@ def scan_dir(rules, path):
             nrules = rule.Rules.read(fp)
         rules = rules.union(nrules)
 
+    print 'Scanning {}'.format(path)
+    rules.dump()
+    print
+
     fnames = os.listdir(path)
     files = []
     dirs = []

@@ -59,3 +59,15 @@ def parse_var(name, value):
             return vartype.read(value)
         except ValueError as ex:
             raise ValueError('invalid value for {}: {}'.format(name, ex))
+
+def dump_var(name, value):
+    try:
+        vartype = ENV_TYPES[name]
+    except KeyError:
+        raise ValueError('unknown variable: {!r}'.format(name))
+    try:
+        if value == vartype.default:
+            return name
+    except AttributeError:
+        pass
+    return '{} = {}'.format(name, vartype.write(value))

@@ -60,9 +60,7 @@ class Rules(object):
     __slots__ = ['env', 'rules']
 
     def __init__(self, env, rules):
-        e = dict(DEFAULT_ENV)
-        e.update(env)
-        self.env = e
+        self.env = dict(env)
         self.rules = tuple(rules)
 
     def __nonzero__(self):
@@ -70,7 +68,8 @@ class Rules(object):
 
     def file_env(self, fname):
         """Get the environment for a file, or None if the file is ignored."""
-        env = dict(self.env)
+        env = dict(DEFAULT_ENV)
+        env.update(self.env)
         for patternset, rule in self.rules:
             if patternset.match_file(fname):
                 env.update(rule.env)
@@ -89,7 +88,7 @@ class Rules(object):
             if match:
                 env.update(rule.env)
                 rules.extend(rule.rules)
-        if env['ignore']:
+        if env.get('ignore', False):
             return None
         return Rules(env, rules)
 
@@ -136,3 +135,23 @@ class Rules(object):
                 assert False
         return class_(env, rules)
     
+    @classmethod
+    def read_gitignore(class_, fp):
+        """Read rules from a gitignore file."""
+        p = pattern.PatternSet.read(fp)
+        return class_({}, [(p, Rules({'ignore': True}, []))])
+
+    def _dump(self, indent, patternset):
+        istr = ' ' * indent
+        if patternset is not None:
+            for positive, pattern in patternset.patterns:
+                print '{}{} {}'.format(istr, '+' if positive else '-', pattern)
+        for k, v in sorted(self.env.iteritems()):
+            print '{}{}'.format(istr, environ.dump_var(k, v))
+        for patternset, rules in self.rules:
+            print '{}{{'.format(istr)
+            rules._dump(indent + 4, patternset)
+            print '{}}}'.format(istr)
+
+    def dump(self):
+        self._dump(0, None)
