@@ -4,6 +4,15 @@ from . import rule
 
 def scan_dir(rules, path):
     try:
+        fp = open(os.path.join(path, '.gitignore'))
+    except IOError:
+        pass
+    else:
+        with fp:
+            nrules = rule.Rules.read_gitignore(fp)
+        rules = rules.union(nrules)
+
+    try:
         fp = open(os.path.join(path, '.header'))
     except IOError:
         pass
@@ -11,10 +20,6 @@ def scan_dir(rules, path):
         with fp:
             nrules = rule.Rules.read(fp)
         rules = rules.union(nrules)
-
-    print 'Scanning {}'.format(path)
-    rules.dump()
-    print
 
     fnames = os.listdir(path)
     files = []
@@ -30,7 +35,6 @@ def scan_dir(rules, path):
         env = rules.file_env(fname)
         if env is None:
             continue
-        print os.path.join(path, fname)
 
     for fname in dirs:
         drules = rules.dir_rules(fname)

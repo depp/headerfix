@@ -1,4 +1,7 @@
+import os
 from . import environ
+from . import pattern
+from . import git
 
 DEFAULT_ENV = {
     'ignore': False,
@@ -94,6 +97,10 @@ class Rules(object):
 
     def union(self, other):
         """Compute the union of two sets of rules."""
+        if not other:
+            return self
+        if not self:
+            return other
         e = dict(self.env)
         e.update(other.env)
         return Rules(e, self.rules + other.rules)
@@ -140,6 +147,19 @@ class Rules(object):
         """Read rules from a gitignore file."""
         p = pattern.PatternSet.read(fp)
         return class_({}, [(p, Rules({'ignore': True}, []))])
+
+    @classmethod
+    def read_global_gitignore(class_):
+        """Read rules from the global gitignore file."""
+        value = git.get_gitconfig('core', 'excludesfile', True)
+        if value is None:
+            return None
+        try:
+            fp = open(os.path.expanduser(value), 'r')
+        except IOError:
+            return None
+        with fp:
+            return class_.read_gitignore(fp)
 
     def _dump(self, indent, patternset):
         istr = ' ' * indent

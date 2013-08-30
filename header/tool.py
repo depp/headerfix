@@ -53,7 +53,7 @@ def run(args):
     args = parser.parse_args()
 
     rules = rule.Rules({}, [])
-    #rules = rules.union(rule.read_global_gitignore())
+    rules = rules.union(rule.Rules.read_global_gitignore())
     scan.scan_dir(rules, '.')
 
 if __name__ == '__main__':

@@ -83,7 +83,7 @@ class PatternSet(object):
             pat_match, pat_patterns = pattern.match_dir(name)
             dir_patterns.extend(
                 (positive, pat_pattern) for pat_pattern in pat_patterns)
-            if match:
+            if pat_match:
                 dir_match = positive
         return dir_match, PatternSet(dir_patterns)
 
@@ -129,7 +129,12 @@ class PatternSet(object):
             line = line.strip()
             if not line or line.startswith('#'):
                 continue
-            patterns.append(line)
+            if line.startswith('!'):
+                positive = False
+                line = line[1:]
+            else:
+                positive = True
+            patterns.append((positive, GlobPattern.parse(line)))
         return class_(patterns)
 
     def dump(self):
