@@ -47,6 +47,15 @@ class GlobPattern(object):
         pat = '/'.join(self.parts)
         return '/' + pat if self.rooted else pat
 
+    @classmethod
+    def parse(class_, string):
+        directory = string.endswith('/')
+        rooted = string.startswith('/')
+        parts = [part for part in string.split('/') if part]
+        if directory:
+            parts.append('')
+        return class_(rooted, parts)
+
 class PatternSet(object):
     """A set of positive and negative patterns."""
     __slots__ = ['patterns']
@@ -106,16 +115,11 @@ class PatternSet(object):
                     continue
             else:
                 positive = True
-            directory = string.endswith('/')
-            rooted = string.startswith('/')
-            parts = [part for part in string.split('/') if part]
-            if directory:
-                parts.append('')
-            patterns.append((positive, GlobPattern(rooted, parts)))
+            patterns.append((pasitive, GlobPattern.parse(string)))
         return class_(patterns)
 
     @classmethod
-    def read(self, fp):
+    def read(class_, fp):
         """Make a pattern set by parsing patterns from a file.
 
         This tries to use the same syntax as gitignore files.
