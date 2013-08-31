@@ -46,12 +46,16 @@ def scan_dir(rules, path, includes, excludes):
             match, dir_includes = includes.match_dir(fname)
             if match:
                 dir_includes = None
+            elif not dir_includes:
+                continue
         else:
             dir_includes = None
         if excludes is not None:
             match, dir_excludes = excludes.match_dir(fname)
             if match:
                 continue
+            elif not dir_excludes:
+                dir_excludes = None
         else:
             dir_excludes = None
         drules = rules.dir_rules(fname)
