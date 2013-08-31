@@ -53,14 +53,29 @@ class SourceFile(object):
         if self.filetype.name in ('h', 'hxx'):
             yield 'headerguard'
 
-    def show_diff(self):
-        text = ''.join(self.lines)
+    def write(self, fp):
+        for line in self.lines:
+            fp.write(line)
+
+    def save(self):
+        with open(self.path, 'w') as fp:
+            self.write(fp)
+
+    def diff(self):
+        """Get the difference between the new text and the original.
+
+        Returns None if there is no difference.
+        """
         proc = subprocess.Popen(
             ['diff', '-u', '--', self.path, '-'],
-            stdin=subprocess.PIPE)
-        proc.communicate(text)
-        if proc.returncode not in (0, 1):
-            raise Exception('diff returned {}'.format(proc.returncode))
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE)
+        stdout, stderr = proc.communicate(''.join(self.lines))
+        if proc.returncode == 0:
+            return None
+        elif proc.returncode == 1:
+            return stdout
+        raise Exception('diff returned {}'.format(proc.returncode))
 
     def shebang_filter1(self):
         if not self.lines or not self.lines[0].startswith('#!'):

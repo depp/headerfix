@@ -8,6 +8,7 @@ from . import pattern
 from . import sourcefile
 from . import filetype
 from . import comment
+from . import diff
 from .colors import colors
 try:
     import readline
@@ -18,12 +19,8 @@ def error(msg):
     print >>sys.stderr, 'error: {}'.format(msg)
     sys.exit(1)
 
-def ask(what, default):
-    if default is None:
-        prompt = what
-    else:
-        prompt = '{} [{}]'.format(what, default)
-    prompt = '{0.bold.blue}{1}:{0.reset} '.format(colors(), prompt)
+def ask(what, default, choices=()):
+    prompt = '{0.bold.blue}{1}{0.reset} '.format(colors(), what)
     while True:
         try:
             answer = raw_input(prompt)
@@ -35,7 +32,12 @@ def ask(what, default):
             sys.exit(1)
         answer = answer.strip()
         if answer:
-            return answer
+            if choices:
+                answer = answer.upper()
+                if answer in choices:
+                    return answer
+            else:
+                return answer
         elif default is not None:
             return default
 
@@ -130,7 +132,21 @@ def run(args):
         src = sourcefile.SourceFile(path, relpath, env, ftype)
 
         src.run_filters()
-        src.show_diff()
+        if args.whitespace:
+            src.expand_tabs()
+            src.fix_whitespace()
+        d = src.diff()
+        if d is not None:
+            print
+            print
+            diff.show_diff(d)
+            choice = ask(
+                'Apply changes to {} [y,n,q]?'.format(relpath),
+                None, ('Y', 'N', 'Q'))
+            if choice == 'Q':
+                return
+            if choice == 'Y':
+                src.save()
 
 if __name__ == '__main__':
     import sys
