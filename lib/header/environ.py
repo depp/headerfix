@@ -36,7 +36,7 @@ class StringType(object):
 
 ENV_TYPES = {
     'ignore': BoolType(),
-    'guard_prefix': StringType(),
+    'guardname': StringType(),
     'guards': BoolType(),
     'width': IntType(0, None),
     'tabsize': IntType(1, 8),

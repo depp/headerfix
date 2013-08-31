@@ -1,4 +1,5 @@
 import collections
+import os
 
 Filetype = collections.namedtuple(
     'Filetype', 'name exts linecomment blockcomment')
@@ -18,6 +19,8 @@ def _filetype(name, exts, linecomment, blockcomment):
         EXTS[ext] = val
     FILETYPES[name] = val
 
+UNKNOWN = Filetype('unknown', (), None, None)
+
 _filetype('h', '.h', '//', '/* */')
 _filetype('hxx', '.hpp .hxx', '//', '/* */')
 _filetype('c', '.c', '//', '/* */')
@@ -25,3 +28,6 @@ _filetype('cxx', '.cp .cpp .cxx', '//', '/* */')
 _filetype('objc', '.m', '//', '/* */')
 _filetype('python', '.py', '#', None)
 _filetype('shell', '.sh', '#', None)
+
+def get_filetype(path):
+    return EXTS.get(os.path.splitext(path)[1], UNKNOWN)

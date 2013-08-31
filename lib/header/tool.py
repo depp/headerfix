@@ -101,18 +101,11 @@ def run(args):
     rules = rules.union(rule.Rules.read_global_gitignore())
     for path, env in scan.scan_dir(rules, root, includes, excludes):
         relpath = os.path.relpath(path)
-        ext = os.path.splitext(path)[1]
-        ftype = filetype.EXTS.get(ext)
+        ftype = filetype.get_filetype(path)
         src = sourcefile.SourceFile(path, relpath, env, ftype)
 
-        print relpath
-        clines, blines = comment.extract_lead_comment(src.lines, ftype)
-        for line in clines:
-            print '    {1}{0.red.bold}{2}{0.reset}{3}'.format(
-                colors(), line[0], line[1], line[2].rstrip())
-        if blines:
-            print '   {}'.format(blines[0].rstrip())
-        print
+        src.run_filters()
+        src.show_diff()
 
 if __name__ == '__main__':
     import sys

@@ -72,15 +72,49 @@ def extract_lead_comment(lines, filetype):
     content.  If no comment is found, then the comment is an empty
     list.
     """
-    if filetype is not None:
-        linecomment = filetype.linecomment
-        blockcomment = filetype.blockcomment
-        if linecomment is not None:
-            value = extract_lead_linecomment(lines, linecomment)
-            if value is not None:
-                return value
-        if blockcomment is not None:
-            value = extract_lead_blockcomment(lines, *blockcomment)
-            if value is not None:
-                return value
+    linecomment = filetype.linecomment
+    blockcomment = filetype.blockcomment
+    if linecomment is not None:
+        value = extract_lead_linecomment(lines, linecomment)
+        if value is not None:
+            return value
+    if blockcomment is not None:
+        value = extract_lead_blockcomment(lines, *blockcomment)
+        if value is not None:
+            return value
     return [], lines
+
+def extract_lead_comments(lines, filetype):
+    """Extract all leading comments from a file.
+
+    Returns (comments,body), where comments are blank lines and
+    comments, and body is the rest of the file. 
+    """
+    head = []
+    while lines:
+        pos = 0
+        while pos < len(lines) and not lines[0].strip():
+            pos += 1
+        chead, cbody = extract_lead_comment(lines[pos:], filetype)
+        if not chead:
+            break
+        head.extend(lines[:pos])
+        for pre, body, post in chead:
+            head.append(pre + body + post)
+        lines = cbody
+    return head, lines
+
+def remove_blank_lines(lines):
+    """Remove blank lines.
+
+    Returns (pre,body,post), where body neither starts nor ends with a
+    blank line, and concatenating all three results in the original
+    object.
+    """
+    spos = 0
+    send = len(lines)
+    while spos < send and not lines[spos].strip():
+        spos += 1
+    while send > send and not lines[send - 1].strip():
+        send -= 1
+    return lines[:spos], lines[spos:send], lines[send:]

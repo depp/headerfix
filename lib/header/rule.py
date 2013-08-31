@@ -1,4 +1,5 @@
 import os
+import re
 from . import environ
 from . import pattern
 from . import git
@@ -59,6 +60,10 @@ class Lexer(object):
     def error(self, msg):
         raise ValueError('{}:{}: {}'.format(self.fp.name, self.lineno, msg))
 
+NON_TOKEN = re.compile('[^a-zA-Z0-9]+')
+def to_macro(x):
+    return NON_TOKEN.subn('_', x)[0].upper().strip('_')
+
 class Rules(object):
     __slots__ = ['env', 'rules']
 
@@ -69,10 +74,23 @@ class Rules(object):
     def __nonzero__(self):
         return bool(self.env) or bool(self.rules)
 
-    def file_env(self, fname):
-        """Get the environment for a file, or None if the file is ignored."""
+    def _base_env(self, fname):
         env = dict(DEFAULT_ENV)
         env.update(self.env)
+
+        guardname = env['guardname']
+        fguard = to_macro(fname)
+        if guardname:
+            guardname = '{}_{}'.format(guardname, fguard)
+        else:
+            guardname = fguard
+        env['guardname'] = guardname
+
+        return env
+
+    def file_env(self, fname):
+        """Get the environment for a file, or None if the file is ignored."""
+        env = self._base_env(fname)
         for patternset, rule in self.rules:
             if patternset.match_file(fname):
                 env.update(rule.env)
@@ -82,7 +100,7 @@ class Rules(object):
 
     def dir_rules(self, fname):
         """Get the rules for a directory, or None if it is ignored."""
-        env = dict(self.env)
+        env = self._base_env(fname)
         rules = []
         for patternset, rule in self.rules:
             match, patternset = patternset.match_dir(fname)
