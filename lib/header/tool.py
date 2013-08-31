@@ -123,6 +123,7 @@ def run(args):
 
     rules = rule.Rules({}, [])
     rules = rules.union(rule.Rules.read_global_gitignore())
+    long_lines = []
     for path, env in scan.scan_dir(rules, root, includes, excludes):
         relpath = os.path.relpath(path)
         ftype = filetype.get_filetype(path)
@@ -134,6 +135,10 @@ def run(args):
         if args.whitespace:
             src.expand_tabs()
             src.fix_whitespace()
+        flong_lines = list(src.long_lines())
+        if flong_lines:
+            long_lines.append((relpath, flong_lines))
+
         d = src.diff()
         if d is not None:
             if args.no_action:
@@ -154,6 +159,13 @@ def run(args):
                     return
                 if choice == 'Y':
                     src.save()
+
+    if long_lines:
+        for relpath, flong_lines in long_lines:
+            print
+            print '{}: Lines too long'.format(relpath)
+            for lineno, width in flong_lines:
+                print '    {}: {} columns'.format(lineno, width)
 
 if __name__ == '__main__':
     import sys

@@ -79,6 +79,20 @@ class SourceFile(object):
             return stdout
         raise Exception('diff returned {}'.format(proc.returncode))
 
+    def long_lines(self):
+        """Enumerate (lineno,width) lines that are too long."""
+        width = self.env['width']
+        if width <= 0:
+            return
+        for lineno, line in enumerate(self.lines, 1):
+            line = line.rstrip('\n')
+            if len(line) > width:
+                for exception in (): #('http://', 'https://', 'ftp://'):
+                    if exception in line:
+                        break
+                else:
+                    yield lineno, len(line)
+
     def shebang_filter1(self):
         if not self.lines or not self.lines[0].startswith('#!'):
             return None
