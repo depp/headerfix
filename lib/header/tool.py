@@ -119,10 +119,7 @@ def run(args):
     else:
         includes = None
 
-    if args.ignore:
-        excludes = pattern.PatternSet.parse(args.ignore)
-    else:
-        excludes = None
+    excludes = pattern.PatternSet.parse(['.*'] + args.ignore)
 
     rules = rule.Rules({}, [])
     rules = rules.union(rule.Rules.read_global_gitignore())
