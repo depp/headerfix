@@ -50,6 +50,7 @@ class Lexer(object):
                 except ValueError as ex:
                     self.error(ex)
             if len(fields) == 1:
+                name = fields[0]
                 try:
                     return 'SET', (name, environ.parse_var(name, None))
                 except ValueError as ex:
