@@ -9,10 +9,35 @@ from . import sourcefile
 from . import filetype
 from . import comment
 from .colors import colors
+try:
+    import readline
+except ImportError:
+    pass
 
 def error(msg):
     print >>sys.stderr, 'error: {}'.format(msg)
     sys.exit(1)
+
+def ask(what, default):
+    if default is None:
+        prompt = what
+    else:
+        prompt = '{} [{}]'.format(what, default)
+    prompt = '{0.bold.blue}{1}:{0.reset} '.format(colors(), prompt)
+    while True:
+        try:
+            answer = raw_input(prompt)
+        except KeyboardInterrupt:
+            print
+            raise
+        except EOFError:
+            print
+            sys.exit(1)
+        answer = answer.strip()
+        if answer:
+            return answer
+        elif default is not None:
+            return default
 
 def relpath_parts(path, base):
     parts = []
