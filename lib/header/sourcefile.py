@@ -52,6 +52,8 @@ class SourceFile(object):
         yield 'copyright'
         if self.filetype.name in ('h', 'hxx'):
             yield 'headerguard'
+        if self.filetype.name == 'h' and self.env['extern_c']:
+            yield 'externc'
 
     def write(self, fp):
         for line in self.lines:
@@ -124,3 +126,17 @@ class SourceFile(object):
             return
         head = [pre + lbody + post for pre, lbody, post in val]
         self.lines = head + self.lines
+
+    def externc_filter1(self):
+        return any('extern "C"' in line for line in self.lines)
+
+    def externc_filter2(self, value):
+        if value:
+            return
+        head = ['#ifdef __cplusplus\n',
+                'extern "C" {\n',
+                '#endif\n']
+        tail = ['#ifdef __cplusplus\n',
+                '}\n',
+                '#endif\n']
+        self.lines = head + self.lines + tail
