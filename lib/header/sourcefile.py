@@ -23,6 +23,30 @@ class SourceFile(object):
         for filter2, obj in objs:
             filter2(obj)
 
+    def fix_whitespace(self):
+        """Fix minor whitespace issues.
+
+        Removes extra blank lines, trailing whitespace, and ensures
+        that there is a line break at the end of the file.
+        """
+        lines = []
+        blank = False
+        for line in self.lines:
+            line = line.rstrip()
+            if line:
+                if blank and lines:
+                    lines.append('\n')
+                lines.append(line + '\n')
+                blank = False
+            else:
+                blank = True
+        self.lines = lines
+
+    def expand_tabs(self):
+        """Convert tabs to spaces."""
+        width = self.env['tabsize']
+        self.lines = [line.expandtabs(width) for line in self.lines]
+
     def filters(self):
         yield 'shebang'
         yield 'copyright'
