@@ -5,12 +5,16 @@ import sys
 from . import rule
 from . import scan
 from . import pattern
+from . import sourcefile
+from . import filetype
+from . import comment
+from .colors import colors
 
 def error(msg):
     print >>sys.stderr, 'error: {}'.format(msg)
     sys.exit(1)
 
-def relpath(path, base):
+def relpath_parts(path, base):
     parts = []
     curpath = path
     while curpath != base:
@@ -81,7 +85,7 @@ def run(args):
     root = subprocess.check_output(
         ['git', 'rev-parse', '--show-toplevel'],
         cwd=root)[:-1]
-    paths = [relpath(path, root) for path in paths]
+    paths = [relpath_parts(path, root) for path in paths]
     if all(paths):
         includes = pattern.PatternSet(
             (True, pattern.LiteralPattern(True, path)) for path in paths)
@@ -96,7 +100,19 @@ def run(args):
     rules = rule.Rules({}, [])
     rules = rules.union(rule.Rules.read_global_gitignore())
     for path, env in scan.scan_dir(rules, root, includes, excludes):
-        print path
+        relpath = os.path.relpath(path)
+        ext = os.path.splitext(path)[1]
+        ftype = filetype.EXTS.get(ext)
+        src = sourcefile.SourceFile(path, relpath, env, ftype)
+
+        print relpath
+        clines, blines = comment.extract_lead_comment(src.lines, ftype)
+        for line in clines:
+            print '    {1}{0.red.bold}{2}{0.reset}{3}'.format(
+                colors(), line[0], line[1], line[2].rstrip())
+        if blines:
+            print '   {}'.format(blines[0].rstrip())
+        print
 
 if __name__ == '__main__':
     import sys
