@@ -126,6 +126,8 @@ def run(args):
     for path, env in scan.scan_dir(rules, root, includes, excludes):
         relpath = os.path.relpath(path)
         ftype = filetype.get_filetype(path)
+        if ftype.name == 'unknown':
+            continue
         src = sourcefile.SourceFile(path, relpath, env, ftype)
 
         src.run_filters()
