@@ -134,16 +134,24 @@ def run(args):
             src.fix_whitespace()
         d = src.diff()
         if d is not None:
-            print
-            print
-            diff.show_diff(d)
-            choice = ask(
-                'Apply changes to {} [y,n,q]?'.format(relpath),
-                None, ('Y', 'N', 'Q'))
-            if choice == 'Q':
-                return
-            if choice == 'Y':
+            if args.no_action:
+                print
+                print
+                diff.show_diff(d)
+            elif args.yes:
+                print('Updating {}'.format(relpath))
                 src.save()
+            else:
+                print
+                print
+                diff.show_diff(d)
+                choice = ask(
+                    'Apply changes to {} [y,n,q]?'.format(relpath),
+                    None, ('Y', 'N', 'Q'))
+                if choice == 'Q':
+                    return
+                if choice == 'Y':
+                    src.save()
 
 if __name__ == '__main__':
     import sys
