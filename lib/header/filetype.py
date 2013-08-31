@@ -28,6 +28,8 @@ _filetype('cxx', '.cp .cpp .cxx', '//', '/* */')
 _filetype('objc', '.m', '//', '/* */')
 _filetype('python', '.py', '#', None)
 _filetype('shell', '.sh', '#', None)
+_filetype('xml', '.xml', None, '<!-- -->')
+_filetype('text', '.txt', None, None)
 
 def get_filetype(path):
     return EXTS.get(os.path.splitext(path)[1], UNKNOWN)
