@@ -79,7 +79,7 @@ class Rules(object):
         env = dict(DEFAULT_ENV)
         env.update(self.env)
 
-        guardname = env['guardname']
+        guardname = env.get('guardname', '')
         fguard = to_macro(fname)
         if guardname:
             guardname = '{}_{}'.format(guardname, fguard)
