@@ -141,8 +141,13 @@ def comment(lines, filetype, width):
     if filetype.linecomment:
         swidth = len(filetype.linecomment) + 1
         width = width - len(filetype.linecomment) - 1
-        newlines = ['{} {}'.format(filetype.linecomment, line)
-                    for line in lines]
+        newlines = []
+        for line in lines:
+            line = line.rstrip()
+            if line:
+                newlines.append('{} {}\n'.format(filetype.linecomment, line))
+            else:
+                newlines.append('{}\n'.format(filetype.linecomment))
         newlines.append('\n')
         return newlines
     raise ValueError('cannot comment')
