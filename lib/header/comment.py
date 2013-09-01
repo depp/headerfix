@@ -1,3 +1,8 @@
+# Copyright 2013 Dietrich Epp.
+#
+# This file is part of HeaderFix.  HeaderFix is distributed under the terms of
+# the 2-clause BSD license.  See LICENSE.txt for details.
+
 import re
 
 def extract_lead_linecomment(lines, linecomment):
@@ -88,7 +93,7 @@ def extract_lead_comments(lines, filetype):
     """Extract all leading comments from a file.
 
     Returns (comments,body), where comments are blank lines and
-    comments, and body is the rest of the file. 
+    comments, and body is the rest of the file.
     """
     head = []
     while lines:

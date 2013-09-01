@@ -1,3 +1,8 @@
+# Copyright 2013 Dietrich Epp.
+#
+# This file is part of HeaderFix.  HeaderFix is distributed under the terms of
+# the 2-clause BSD license.  See LICENSE.txt for details.
+
 import re
 from . import git
 from . import util
@@ -78,7 +83,8 @@ class AutoAuthorship(object):
         if self.author is None:
             default = git.get_gitconfig('user', 'name')
             if default:
-                author = util.ask('Author name [{}]:'.format(default), default)
+                author = util.ask('Author name [{}]:'
+                                  .format(default), default)
             else:
                 author = util.ask('Author name:')
             self.author = author

@@ -1,3 +1,8 @@
+# Copyright 2013 Dietrich Epp.
+#
+# This file is part of HeaderFix.  HeaderFix is distributed under the terms of
+# the 2-clause BSD license.  See LICENSE.txt for details.
+
 import os
 import re
 from . import environ
@@ -70,7 +75,7 @@ class Lexer(object):
                     self.error(ex)
             self.error('syntax error')
         raise StopIteration()
-            
+
     def error(self, msg):
         raise ValueError('{}:{}: {}'.format(self.fp.name, self.lineno, msg))
 
@@ -173,7 +178,7 @@ class Rules(object):
             else:
                 assert False
         return class_(env, rules)
-    
+
     @classmethod
     def read_gitignore(class_, fp):
         """Read rules from a gitignore file."""
@@ -197,7 +202,8 @@ class Rules(object):
         istr = ' ' * indent
         if patternset is not None:
             for positive, pattern in patternset.patterns:
-                print '{}{} {}'.format(istr, '+' if positive else '-', pattern)
+                print '{}{} {}'.format(
+                    istr, '+' if positive else '-', pattern)
         for k, v in sorted(self.env.iteritems()):
             print '{}{}'.format(istr, environ.dump_var(k, v))
         for patternset, rules in self.rules:

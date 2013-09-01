@@ -1,3 +1,8 @@
+# Copyright 2013 Dietrich Epp.
+#
+# This file is part of HeaderFix.  HeaderFix is distributed under the terms of
+# the 2-clause BSD license.  See LICENSE.txt for details.
+
 import re
 
 YEAR = re.compile(r'\d+')
@@ -28,7 +33,8 @@ def parse_years(years):
             if year > lastyear:
                 yearset.update(range(lastyear + 1, year + 1))
             else:
-                raise ValueError('year range goes backwards: {}'.format(years))
+                raise ValueError(
+                    'year range goes backwards: {}'.format(years))
             lastyear = None
         else:
             yearset.add(year)
