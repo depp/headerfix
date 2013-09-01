@@ -205,6 +205,8 @@ class Rules(object):
                 print '{}{} {}'.format(
                     istr, '+' if positive else '-', pattern)
         for k, v in sorted(self.env.iteritems()):
+            if k.startswith('_'):
+                continue
             print '{}{}'.format(istr, environ.dump_var(k, v))
         for patternset, rules in self.rules:
             print '{}{{'.format(istr)
