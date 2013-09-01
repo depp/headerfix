@@ -153,6 +153,8 @@ class SourceFile(object):
             for line in self.env['copyright_notice'].splitlines():
                 lines.append(line + '\n')
         lines = comment.comment(lines, self.filetype, self.env['width'])
+        if lines and self.lines and self.lines[0].strip():
+            lines.append('\n')
         self.lines = lines + self.lines
 
     def externc_filter1(self):

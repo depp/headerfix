@@ -148,6 +148,5 @@ def comment(lines, filetype, width):
                 newlines.append('{} {}\n'.format(filetype.linecomment, line))
             else:
                 newlines.append('{}\n'.format(filetype.linecomment))
-        newlines.append('\n')
         return newlines
     raise ValueError('cannot comment')
