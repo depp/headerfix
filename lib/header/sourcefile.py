@@ -8,7 +8,8 @@ from . import comment
 from . import copyright
 
 class SourceFile(object):
-    __slots__ = ['path', 'relpath', 'env', 'filetype', 'lines']
+    __slots__ = ['path', 'relpath', 'env', 'filetype', 'lines',
+                 'addspace_start', 'addspace_end']
 
     def __init__(self, path, relpath, env, filetype):
         self.path = path
@@ -17,6 +18,8 @@ class SourceFile(object):
         self.filetype = filetype
         with open(path, 'r') as fp:
             self.lines = fp.readlines()
+        self.addspace_start = True
+        self.addspace_end = True
 
     def run_filters(self):
         objs = []
@@ -99,6 +102,34 @@ class SourceFile(object):
                 else:
                     yield lineno, len(line)
 
+    def wrap(self, head, tail, addspace_start, addspace_end):
+        """Concatenate head and tail onto the beginning and end.
+
+        If addspace_start is True and text is added to the beginning,
+        then future non-zero starting text will get a line of padding.
+        If addspace_end is true and text is added to the end, then
+        future non-zero ending text will get a line of padding.
+        """
+        head = list(head or ())
+        tail = list(tail or ())
+        if (len(self.lines) < 2 and
+            not any(line.strip() for line in self.lines) and
+            (self.addspace_start or self.addspace_end) and
+            head and tail):
+            self.lines = ['\n'] * 2
+        if head:
+            if (self.addspace_start and
+                self.lines and self.lines[0].strip()):
+                head.append('\n')
+            self.addspace_start = addspace_start
+        if tail:
+            if (self.addspace_end and
+                self.lines and self.lines[-1].strip()):
+                tail.insert(0, '\n')
+            self.addspace_end = addspace_end
+        if head or tail:
+            self.lines = head + self.lines + tail
+
     def shebang_filter1(self):
         if not self.lines or not self.lines[0].startswith('#!'):
             return None
@@ -106,7 +137,7 @@ class SourceFile(object):
 
     def shebang_filter2(self, shebang):
         if shebang is not None:
-            self.lines.insert(0, shebang)
+            self.wrap([shebang], None, False, False)
 
     def headerguard_filter1(self):
         head, body = comment.extract_lead_comments(self.lines, self.filetype)
@@ -121,15 +152,14 @@ class SourceFile(object):
         return head
 
     def headerguard_filter2(self, comments):
-        head = comments or []
+        head = list(comments or ())
         tail = []
         guardname = self.env['guardname']
         if self.env['guards'] and guardname:
             head.extend(['#ifndef {}\n'.format(guardname),
                          '#define {}\n'.format(guardname)])
             tail.append('#endif\n')
-        if head or tail:
-            self.lines = head + self.lines + tail
+        self.wrap(head, tail, bool(comments), False)
 
     def copyright_filter1(self):
         head, body = comment.extract_lead_comment(self.lines, self.filetype)
@@ -158,9 +188,13 @@ class SourceFile(object):
             for line in self.env['copyright_notice'].splitlines():
                 lines.append(line + '\n')
         lines = comment.comment(lines, self.filetype, self.env['width'])
-        if lines and self.lines and self.lines[0].strip():
-            lines.append('\n')
-        self.lines = lines + self.lines
+        if (self.filetype.blockcomment is None and
+            self.lines and
+            self.lines[0].strip().startswith(self.filetype.linecomment)):
+            self.addspace_start = True
+        else:
+            self.addspace_start = False
+        self.wrap(lines, None, False, False)
 
     def externc_filter1(self):
         return any('extern "C"' in line for line in self.lines)
@@ -174,4 +208,4 @@ class SourceFile(object):
         tail = ['#ifdef __cplusplus\n',
                 '}\n',
                 '#endif\n']
-        self.lines = head + self.lines + tail
+        return self.wrap(head, tail, False, False)
