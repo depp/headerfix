@@ -11,7 +11,7 @@ def find_executable(name):
             return epath
     return None
 
-def ask(what, default, choices=()):
+def ask(what, default=None, choices=()):
     prompt = '{0.bold.blue}{1}{0.reset} '.format(colors.colors(), what)
     while True:
         try:

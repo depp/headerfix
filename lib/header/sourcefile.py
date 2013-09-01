@@ -1,5 +1,6 @@
 import subprocess
-import comment
+from . import comment
+from . import copyright
 
 class SourceFile(object):
     __slots__ = ['path', 'relpath', 'env', 'filetype', 'lines']
@@ -136,10 +137,23 @@ class SourceFile(object):
         return head
 
     def copyright_filter2(self, val):
-        if val is None:
+        if not self.env['fix_copyright']:
+            head = [pre + lbody + post for pre, lbody, post in val]
+            self.lines = head + self.lines
             return
-        head = [pre + lbody + post for pre, lbody, post in val]
-        self.lines = head + self.lines
+        if (self.filetype.linecomment is None and
+            self.filetype.blockcomment is None):
+            return
+        authorship = copyright.Authorship()
+        if val is not None:
+            authorship.parse([line for pre, line, post in val])
+        self.env['_authorship'].add_authorship(authorship)
+        lines = authorship.dump()
+        if self.env['copyright_notice']:
+            for line in self.env['copyright_notice'].splitlines():
+                lines.append(line + '\n')
+        lines = comment.comment(lines, self.filetype, self.env['width'])
+        self.lines = lines + self.lines
 
     def externc_filter1(self):
         return any('extern "C"' in line for line in self.lines)

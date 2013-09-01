@@ -10,6 +10,8 @@ from . import filetype
 from . import comment
 from . import diff
 from . import util
+from . import copyright
+from . import year
 try:
     import readline
 except ImportError:
@@ -34,11 +36,12 @@ def relpath_parts(path, base):
 def run(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--user',
-        help='user name for copyright notice')
+        '--copyright-author',
+        help='author name for copyright notice')
     parser.add_argument(
-        '--email',
-        help='email address for copyright notice')
+        '--copyright-years',
+        type=year.parse_years,
+        help='years for copyright authorship')
     parser.add_argument(
         '-s', '--strip-copyright',
         dest='strip', action='store_true', default=False,
@@ -99,7 +102,9 @@ def run(args):
 
     excludes = pattern.PatternSet.parse(['.*'] + args.ignore)
 
-    rules = rule.Rules({}, [])
+    authorship = copyright.AutoAuthorship(
+        root, args.copyright_author, args.copyright_years)
+    rules = rule.Rules({'_authorship': authorship}, [])
     rules = rules.union(rule.Rules.read_global_gitignore())
     long_lines = []
     for path, env in scan.scan_dir(rules, root, includes, excludes):

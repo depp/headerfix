@@ -12,6 +12,8 @@ DEFAULT_ENV = {
     'tabsize': 4,
     'extern_c': False,
     'config_header': '',
+    'copyright_notice': '',
+    'fix_copyright': True,
 }
 
 class Lexer(object):
@@ -40,6 +42,17 @@ class Lexer(object):
             if len(fields) >= 2 and fields[1] == '=':
                 if len(fields) == 3:
                     data = fields[2]
+                    if data.startswith('<<'):
+                        token = data[2:]
+                        if not token:
+                            self.error('expected EOF token name after <<')
+                        lines = []
+                        for line in self.fp:
+                            self.lineno += 1
+                            if line.rstrip() == token:
+                                break
+                            lines.append(line)
+                        data = ''.join(lines)
                 elif len(fields) == 2:
                     data = ''
                 else:

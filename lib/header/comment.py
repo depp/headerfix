@@ -118,3 +118,31 @@ def remove_blank_lines(lines):
     while send > send and not lines[send - 1].strip():
         send -= 1
     return lines[:spos], lines[spos:send], lines[send:]
+
+def comment(lines, filetype, width):
+    """Convert lines to comments."""
+    if filetype.blockcomment:
+        swidth = len(filetype.blockcomment[0]) + 1
+        width = width - swidth
+        newlines = []
+        numlines = len(lines)
+        for n in xrange(numlines):
+            if n == 0:
+                pre = filetype.blockcomment[0] + ' '
+            else:
+                pre = ' ' * swidth
+            if n == numlines - 1:
+                post = ' ' + filetype.blockcomment[1]
+            else:
+                post = ''
+            newlines.append('{}{}{}\n'.format(
+                pre, lines[n].rstrip(), post))
+        return newlines
+    if filetype.linecomment:
+        swidth = len(filetype.linecomment) + 1
+        width = width - len(filetype.linecomment) - 1
+        newlines = ['{} {}'.format(filetype.linecomment, line)
+                    for line in lines]
+        newlines.append('\n')
+        return newlines
+    raise ValueError('cannot comment')

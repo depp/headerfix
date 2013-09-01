@@ -42,6 +42,8 @@ ENV_TYPES = {
     'tabsize': IntType(1, 8),
     'extern_c': BoolType(),
     'config_header': StringType(),
+    'copyright_notice': StringType(),
+    'fix_copyright': BoolType(),
 }
 
 def parse_var(name, value):
