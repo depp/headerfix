@@ -9,7 +9,7 @@ from . import sourcefile
 from . import filetype
 from . import comment
 from . import diff
-from .colors import colors
+from . import util
 try:
     import readline
 except ImportError:
@@ -18,28 +18,6 @@ except ImportError:
 def error(msg):
     print >>sys.stderr, 'error: {}'.format(msg)
     sys.exit(1)
-
-def ask(what, default, choices=()):
-    prompt = '{0.bold.blue}{1}{0.reset} '.format(colors(), what)
-    while True:
-        try:
-            answer = raw_input(prompt)
-        except KeyboardInterrupt:
-            print
-            raise
-        except EOFError:
-            print
-            sys.exit(1)
-        answer = answer.strip()
-        if answer:
-            if choices:
-                answer = answer.upper()
-                if answer in choices:
-                    return answer
-            else:
-                return answer
-        elif default is not None:
-            return default
 
 def relpath_parts(path, base):
     parts = []
@@ -152,7 +130,7 @@ def run(args):
                 print
                 print
                 diff.show_diff(d)
-                choice = ask(
+                choice = util.ask(
                     'Apply changes to {} [y,n,q]?'.format(relpath),
                     None, ('Y', 'N', 'Q'))
                 if choice == 'Q':
