@@ -58,7 +58,8 @@ class SourceFile(object):
 
     def filters(self):
         yield 'shebang'
-        yield 'copyright'
+        if self.filetype.source:
+            yield 'copyright'
         if self.filetype.name in ('h', 'hxx'):
             yield 'headerguard'
         if self.filetype.name == 'h' and self.env['extern_c']:
