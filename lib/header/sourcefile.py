@@ -105,7 +105,7 @@ class SourceFile(object):
         for lineno, line in enumerate(self.lines, 1):
             line = line.rstrip('\n')
             if len(line) > width:
-                for exception in (): #('http://', 'https://', 'ftp://'):
+                for exception in ('http://', 'https://', 'ftp://'):
                     if exception in line:
                         break
                 else:
