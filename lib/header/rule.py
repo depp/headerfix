@@ -11,7 +11,7 @@ from . import git
 
 DEFAULT_ENV = {
     'ignore': False,
-    'guard_prefix': '',
+    'guardname': '',
     'guards': False,
     'width': 0,
     'tabsize': 4,
