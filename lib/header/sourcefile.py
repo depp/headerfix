@@ -7,6 +7,14 @@ import subprocess
 from . import comment
 from . import copyright
 
+class ExternC(object):
+    head = ['#ifdef __cplusplus\n',
+            'extern "C" {\n',
+            '#endif\n']
+    tail = ['#ifdef __cplusplus\n',
+            '}\n',
+            '#endif\n']
+
 class SourceFile(object):
     __slots__ = ['path', 'relpath', 'env', 'filetype', 'lines',
                  'addspace_start', 'addspace_end']
@@ -134,6 +142,7 @@ class SourceFile(object):
     def shebang_filter1(self):
         if not self.lines or not self.lines[0].startswith('#!'):
             return None
+        self.addspace_start = False
         return self.lines.pop(0)
 
     def shebang_filter2(self, shebang):
@@ -150,6 +159,8 @@ class SourceFile(object):
             not body[-1].startswith('#endif')):
             return None
         self.lines = body[2:-1]
+        self.addspace_start = False
+        self.addspace_end = False
         return head
 
     def headerguard_filter2(self, comments):
@@ -198,15 +209,29 @@ class SourceFile(object):
         self.wrap(lines, None, False, False)
 
     def externc_filter1(self):
-        return any('extern "C"' in line for line in self.lines)
+        startpos = -1
+        endpos = -1
+        for n, line in enumerate(self.lines):
+            if line != '#ifdef __cplusplus\n':
+                continue
+            lines = self.lines[n:n+3]
+            if lines == ExternC.head:
+                startpos = n
+            elif lines == ExternC.tail:
+                endpos = n
+        if startpos >= 0 and endpos >= 0:
+            preamble = self.lines[:startpos]
+            postamble = self.lines[endpos+3:]
+            self.lines = self.lines[startpos+3:endpos]
+            if preamble:
+                self.addspace_start = False
+            if postamble:
+                self.addspace_end = False
+            return preamble, postamble
+        else:
+            return [], []
 
     def externc_filter2(self, value):
-        if value:
-            return
-        head = ['#ifdef __cplusplus\n',
-                'extern "C" {\n',
-                '#endif\n']
-        tail = ['#ifdef __cplusplus\n',
-                '}\n',
-                '#endif\n']
-        return self.wrap(head, tail, False, False)
+        preamble, postamble = value
+        self.wrap(ExternC.head, ExternC.tail, False, False)
+        self.wrap(preamble, postamble, False, False)
