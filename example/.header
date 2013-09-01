@@ -1,0 +1,20 @@
+guards = true
+guardname = MYLIB
+width = 78
+tabsize = 4
+copyright_notice = <<EOF
+All rights reserved.
+EOF
+
+{
+    + /subdir
+    ignore
+}
+
+{
+    + /include
+    {
+        + *.h
+        extern_c = true
+    }
+}
